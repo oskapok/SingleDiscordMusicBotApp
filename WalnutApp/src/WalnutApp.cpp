@@ -32,6 +32,15 @@ public:
 			}
 		}
 		ImGui::End();
+
+
+		ImGui::Begin("Media Controls");
+		
+		if(ImGui::Button("StopSong"))
+		{
+			StopSong();
+		}
+		ImGui::End();
 	}
 
 	void OnAttach() override;
@@ -39,6 +48,7 @@ public:
 
 	void LoadSong(std::string songPath, std::vector<uint8_t>& SongData);
 	void PlaySong(std::vector<uint8_t>& songData);
+	void StopSong();
 
 private:
 	std::vector<std::string> songPaths;
@@ -57,9 +67,9 @@ void BotLayer::OnAttach()
 		std::cout << entry.path() << std::endl;
 	}
 
-
+	//ImGuiIO& io = ImGui::GetIO();
+	//io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 13, nullptr, io.Fonts->GetGlyphRangesDefault());
 	/* Setup the bot */
-
 	std::ifstream tokenFile;
 	std::string token;
 	std::string line;
@@ -171,6 +181,11 @@ void BotLayer::PlaySong(std::vector<uint8_t>& songData)
 	v->voiceclient->send_audio_raw((uint16_t*)songData.data(), songData.size());
 }
 
+void BotLayer::StopSong()
+{
+	dpp::voiceconn* v = discordClient->get_voice(guildId);
+	v->voiceclient->stop_audio();
+}
 
 
 Walnut::Application* Walnut::CreateApplication(int argc, char** argv)
