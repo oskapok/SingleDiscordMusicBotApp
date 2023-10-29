@@ -30,6 +30,8 @@ constexpr uint_fast16_t SampleRate = 48000;
 class BotLayer : public Walnut::Layer
 {
 public:
+
+
 	virtual void OnUIRender() override
 	{
 		ImGui::Begin("Songs");
@@ -42,16 +44,24 @@ public:
 		}
 		ImGui::End();
 		ImGui::Begin("Media Controls");
-		ImGui::Text(CurrentSongLengthString.data());
+		if(voiceConnection && voiceConnection->voiceclient->is_playing())
+		{
+			ImGui::Text(CurrentlyPlayingSongName.c_str());
+			ImGui::Text(GetCurrentSongTime().c_str());
+			ImGui::SameLine();
+			ImGui::Text(CurrentSongLengthString.data());
+
+			if(ImGui::Button("StopSong"))
+			{
+				StopSong();
+			}
+			ImGui::SameLine();
+			if(ImGui::Button("Pause/Unpause"))
+			{
+				PauseOrUnpauseSong();
+			}
+		}
 		
-		if(ImGui::Button("StopSong"))
-		{
-			StopSong();
-		}
-		if(ImGui::Button("Pause/Unpause"))
-		{
-			PauseOrUnpauseSong();
-		}
 		ImGui::End();
 	}
 
@@ -63,8 +73,8 @@ public:
 	void StopSong();
 	void PauseOrUnpauseSong();
 
-	std::string GetSongDuration(const double& fullSeconds);
-
+	std::string GetSongDuration(const time_t& fullSeconds);
+	std::string GetCurrentSongTime();
 
 	inline async::task<void> fire_and_forget()
 	{
@@ -74,14 +84,18 @@ public:
 
 private:
 	std::vector<std::string> songPaths;
-	dpp::cluster* bot;
+	dpp::cluster* bot = nullptr;
 	dpp::snowflake guildId;
+	dpp::voiceconn* voiceConnection = nullptr;
 	dpp::discord_client* discordClient = nullptr;
 
 	long SongLengthInSamples = 0;
 	double SongLengthInSeconds = 0;
 
 	std::string CurrentSongLengthString;
+	std::string PathToSongFolder = "C://BotSongs/";
+	std::string CurrentlyPlayingSongName;
+
 	
 };
 
@@ -90,7 +104,6 @@ async::task<void> BotLayer::LoadAndPlaySong(const std::string& songPath)
 	std::vector<uint8_t> SongData;
 	SongData.reserve(50000000);
 	
-
 	mpg123_init();
 	int err = 0;
 	unsigned char* buffer;
@@ -119,6 +132,7 @@ async::task<void> BotLayer::LoadAndPlaySong(const std::string& songPath)
 	SongLengthInSeconds = static_cast<double>(SongLengthInSamples) / SampleRate;
 
 	CurrentSongLengthString = GetSongDuration(SongLengthInSeconds);
+	CurrentlyPlayingSongName = songPath.substr(songPath.find_last_of("/\\") + 1);
 
 
 	unsigned int counter = 0;
@@ -142,8 +156,7 @@ async::task<void> BotLayer::LoadAndPlaySong(const std::string& songPath)
 void BotLayer::OnAttach()
 {
 	namespace fs = std::filesystem;
-	std::string path = "C://BotSongs/";
-	for (const auto & entry : fs::directory_iterator(path))
+	for (const auto & entry : fs::directory_iterator(PathToSongFolder.c_str()))
 	{
 		songPaths.emplace_back(entry.path().string());
 		std::cout << entry.path() << std::endl;
@@ -181,6 +194,7 @@ void BotLayer::OnAttach()
             dpp::guild* g = dpp::find_guild(event.command.guild_id);
         	guildId = event.command.guild_id;
         	discordClient = event.from;
+        	voiceConnection = discordClient->get_voice(guildId);
  
             /* Attempt to connect to a voice channel, returns false if we fail to connect. */
             if (!g->connect_member_voice(event.command.get_issuing_user().id)) {
@@ -217,63 +231,61 @@ void BotLayer::OnDetach()
 
 void BotLayer::PlaySong(std::vector<uint8_t>& songData)
 {
-	dpp::voiceconn* v = discordClient->get_voice(guildId);
-	
 	/* Stream the already decoded MP3 file. This passes the PCM data to the library to be encoded to OPUS */
-	v->voiceclient->set_send_audio_type(dpp::discord_voice_client::satype_overlap_audio);
-	v->voiceclient->send_audio_raw((uint16_t*)songData.data(), songData.size());
+	if(!voiceConnection)
+	{
+		voiceConnection = discordClient->get_voice(guildId);
+	}
+	voiceConnection->voiceclient->set_send_audio_type(dpp::discord_voice_client::satype_overlap_audio);
+	voiceConnection->voiceclient->send_audio_raw((uint16_t*)songData.data(), songData.size());
 }
 
 void BotLayer::StopSong()
 {
-	dpp::voiceconn* v = discordClient->get_voice(guildId);
-	v->voiceclient->stop_audio();
+	voiceConnection->voiceclient->stop_audio();
 }
 
 void BotLayer::PauseOrUnpauseSong()
 {
-	dpp::voiceconn* v = discordClient->get_voice(guildId);
-	v->voiceclient->pause_audio(!v->voiceclient->is_paused() ? true : false);
+	voiceConnection->voiceclient->pause_audio(!voiceConnection->voiceclient->is_paused() ? true : false);
 }
 
-std::string BotLayer::GetSongDuration(const double& fullSeconds)
+std::string BotLayer::GetSongDuration(const time_t& fullSeconds)
 {
-	int hours = fullSeconds/3600;
-	int minutes = fullSeconds/60;
-	int seconds = fullSeconds - (hours * 3600) - (minutes*60);
+	uint8_t hours = (uint8_t)(fullSeconds/ 3600);
+	uint8_t mins = (uint8_t)(fullSeconds % 3600 / 60);
+	uint8_t secs = (uint8_t)(fullSeconds % 60);
 
+	if (hours == 0) {
+		char print_buffer[64];
+		snprintf(print_buffer, 64, "%02d:%02d", mins, secs);
+		return print_buffer;
+	} else {
+		char print_buffer[64];
+		snprintf(print_buffer, 64, "%02d:%02d:%02d", hours, mins, secs);
+		return print_buffer;
+	}
+}
 
-	std::string hoursString;
-	std::string minutesString;
-	std::string secondsString;
+std::string BotLayer::GetCurrentSongTime()
+{
+	float secondsRemaining = voiceConnection->voiceclient->get_secs_remaining();
 
+	time_t CurrentTimeSeconds = SongLengthInSeconds - secondsRemaining;
 	
-	if(hours < 10)
-	{
-		hoursString = "0" + std::to_string(hours);
+	uint8_t hours = (uint8_t)(CurrentTimeSeconds/ 3600);
+	uint8_t mins = (uint8_t)(CurrentTimeSeconds % 3600 / 60);
+	uint8_t secs = (uint8_t)(CurrentTimeSeconds % 60);
+
+	if (hours == 0) {
+		char print_buffer[64];
+		snprintf(print_buffer, 64, "%02d:%02d", mins, secs);
+		return print_buffer;
+	} else {
+		char print_buffer[64];
+		snprintf(print_buffer, 64, "%02d:%02d:%02d", hours, mins, secs);
+		return print_buffer;
 	}
-	else
-	{
-		hoursString = std::to_string(hours);
-	}
-	if(minutes <10)
-	{
-		minutesString = "0" + std::to_string(minutes);
-	}
-	else
-	{
-		minutesString =  std::to_string(minutes);
-	}
-	if(seconds <10)
-	{
-		secondsString = "0" + std::to_string(seconds);
-	}
-	else
-	{
-		secondsString = std::to_string(seconds);
-	}
-	
-	return  hoursString+ ":"+ minutesString +":"+ secondsString;
 }
 
 
