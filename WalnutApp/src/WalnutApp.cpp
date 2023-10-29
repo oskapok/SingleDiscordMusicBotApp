@@ -229,8 +229,25 @@ std::string BotLayer::GetSongDuration(const double& fullSeconds)
 	int hours = fullSeconds/3600;
 	int minutes = fullSeconds/60;
 	int seconds = fullSeconds - (hours * 3600) - (minutes*60);
+
+
+	std::string hoursString;
+	std::string minutesString;
+	std::string secondsString;
+	if(hours < 10)
+	{
+		hoursString = "0" + std::to_string(hours);
+	}
+	if(minutes <10)
+	{
+		minutesString = "0" + std::to_string(minutes);
+	}
+	if(seconds <10)
+	{
+		secondsString = "0" + std::to_string(seconds);
+	}
 	
-	return std::to_string(hours) + ":"+ std::to_string(minutes) +":"+ std::to_string(seconds);
+	return  hoursString+ ":"+ minutesString +":"+ secondsString;
 }
 
 
