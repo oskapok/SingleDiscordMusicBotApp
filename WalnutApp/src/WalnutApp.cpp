@@ -56,9 +56,28 @@ void BotLayer::OnAttach()
 		songPaths.emplace_back(entry.path().string());
 		std::cout << entry.path() << std::endl;
 	}
-	
-    /* Setup the bot */
-    bot = new dpp::cluster("MTAyODM1MTA1Njk2NDQ5NzQyMQ.G0ulVE.lUQipKwk7rbqG2WSBn80SsBRTP_0BiiAbAyRM4");
+
+
+	/* Setup the bot */
+
+	std::ifstream tokenFile;
+	std::string token;
+	std::string line;
+	std::string FullPath = std::filesystem::current_path().string() + "\\token.txt";
+	tokenFile.open(FullPath);
+	if (tokenFile.is_open())
+	{
+		if(getline(tokenFile, line)) {
+			token = line;
+		}
+		else
+		{
+			std::cout << "Token is empty";
+			return;
+		}
+		tokenFile.close();
+	}
+    bot = new dpp::cluster(token);
     //bot->on_log(dpp::utility::cout_logger());
 
 	
