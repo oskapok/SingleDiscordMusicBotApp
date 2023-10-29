@@ -5,7 +5,6 @@
 #include <string>
 #include <iostream>
 #include <filesystem>
-
 #include <dpp/dpp.h>
 #include <iomanip>
 #include <sstream>
@@ -17,13 +16,20 @@
 #include <out123.h>
 
 
+#include <atomic>
+#include <csignal>
+#include <iostream>
+#include <stop_token>
+#include <thread>
+#include "async/awaitable_get.h"
+#include "async/task.h"
+
+
 constexpr uint_fast16_t SampleRate = 48000;
 
 class BotLayer : public Walnut::Layer
 {
 public:
-	void LoadAndPlaySong(const std::string& songPath);
-
 	virtual void OnUIRender() override
 	{
 		ImGui::Begin("Songs");
@@ -35,10 +41,8 @@ public:
 			}
 		}
 		ImGui::End();
-
-
 		ImGui::Begin("Media Controls");
-		ImGui::Text(CurrentSongLengthString.c_str());
+		ImGui::Text(CurrentSongLengthString.data());
 		
 		if(ImGui::Button("StopSong"))
 		{
@@ -54,12 +58,19 @@ public:
 	void OnAttach() override;
 	void OnDetach() override;
 
-	void LoadSong(std::string songPath, std::vector<uint8_t>& SongData);
+	async::task<void> LoadAndPlaySong(const std::string& songPath);
 	void PlaySong(std::vector<uint8_t>& songData);
 	void StopSong();
 	void PauseOrUnpauseSong();
 
 	std::string GetSongDuration(const double& fullSeconds);
+
+
+	inline async::task<void> fire_and_forget()
+	{
+		
+		co_return;
+	}
 
 private:
 	std::vector<std::string> songPaths;
@@ -74,7 +85,7 @@ private:
 	
 };
 
-void BotLayer::LoadAndPlaySong(const std::string& songPath)
+async::task<void> BotLayer::LoadAndPlaySong(const std::string& songPath)
 {
 	std::vector<uint8_t> SongData;
 	SongData.reserve(50000000);
@@ -125,6 +136,7 @@ void BotLayer::LoadAndPlaySong(const std::string& songPath)
 	mpg123_exit();
 
 	PlaySong(SongData);
+	co_return;
 }
 
 void BotLayer::OnAttach()
@@ -234,17 +246,31 @@ std::string BotLayer::GetSongDuration(const double& fullSeconds)
 	std::string hoursString;
 	std::string minutesString;
 	std::string secondsString;
+
+	
 	if(hours < 10)
 	{
 		hoursString = "0" + std::to_string(hours);
+	}
+	else
+	{
+		hoursString = std::to_string(hours);
 	}
 	if(minutes <10)
 	{
 		minutesString = "0" + std::to_string(minutes);
 	}
+	else
+	{
+		minutesString =  std::to_string(minutes);
+	}
 	if(seconds <10)
 	{
 		secondsString = "0" + std::to_string(seconds);
+	}
+	else
+	{
+		secondsString = std::to_string(seconds);
 	}
 	
 	return  hoursString+ ":"+ minutesString +":"+ secondsString;
