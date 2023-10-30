@@ -24,22 +24,26 @@
 #include "async/awaitable_get.h"
 #include "async/task.h"
 
+#pragma execution_character_set("utf-8")
 
 constexpr uint_fast16_t SampleRate = 48000;
 
 class BotLayer : public Walnut::Layer
 {
 public:
-
-
 	virtual void OnUIRender() override
 	{
 		ImGui::Begin("Songs");
+		if(ImGui::Button(".."))
+		{
+			GoUpInDirectoryView();
+		}
 		for(auto songPath : songPaths)
 		{
 			if(ImGui::Button(songPath.c_str()))
 			{
-				LoadAndPlaySong(songPath);
+				BrowseFileOrFolder(songPath.c_str());
+				break;
 			}
 		}
 		ImGui::End();
@@ -67,8 +71,11 @@ public:
 
 	void OnAttach() override;
 	void OnDetach() override;
+	void BrowseFileOrFolder(std::string Path);
+	void GoUpInDirectoryView();
 
 	async::task<void> LoadAndPlaySong(const std::string& songPath);
+	void RefreshFolderView();
 	void PlaySong(std::vector<uint8_t>& songData);
 	void StopSong();
 	void PauseOrUnpauseSong();
@@ -153,15 +160,22 @@ async::task<void> BotLayer::LoadAndPlaySong(const std::string& songPath)
 	co_return;
 }
 
-void BotLayer::OnAttach()
+void BotLayer::RefreshFolderView()
 {
+	songPaths.clear();
 	namespace fs = std::filesystem;
-	for (const auto & entry : fs::directory_iterator(PathToSongFolder.c_str()))
+	for ( auto & entry : fs::directory_iterator(PathToSongFolder.c_str()))
 	{
-		songPaths.emplace_back(entry.path().string());
+		std::string path = entry.path().string();
+		std::replace( path.begin(), path.end(), '\\', '/'); 
+		songPaths.emplace_back(path);
 		std::cout << entry.path() << std::endl;
 	}
+}
 
+void BotLayer::OnAttach()
+{
+	RefreshFolderView();
 	//ImGuiIO& io = ImGui::GetIO();
 	//io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 13, nullptr, io.Fonts->GetGlyphRangesDefault());
 	/* Setup the bot */
@@ -227,6 +241,26 @@ void BotLayer::OnDetach()
 {
 	bot->shutdown();
 	Layer::OnDetach();
+}
+
+void BotLayer::BrowseFileOrFolder(std::string Path)
+{
+	if(Path.ends_with(".mp3"))
+	{
+		LoadAndPlaySong(Path);
+	}
+	else
+	{
+		PathToSongFolder = Path;
+		RefreshFolderView();
+	}
+}
+
+void BotLayer::GoUpInDirectoryView()
+{
+	size_t Index = PathToSongFolder.find_last_of('/');
+	PathToSongFolder = PathToSongFolder.substr(0,Index);
+	RefreshFolderView();
 }
 
 void BotLayer::PlaySong(std::vector<uint8_t>& songData)
