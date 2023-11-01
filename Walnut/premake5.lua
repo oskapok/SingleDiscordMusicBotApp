@@ -12,7 +12,6 @@ project "Walnut"
       "src",
 
       "../vendor/imgui",
-      "../vendor/glfw/include",
       "../vendor/stb_image",
 
       "%{IncludeDir.VulkanSDK}",
@@ -22,7 +21,7 @@ project "Walnut"
    links
    {
        "ImGui",
-       "GLFW",
+       "glfw3dll",
 
        "%{Library.Vulkan}",
    }
