@@ -21,8 +21,7 @@
 #include <iostream>
 #include <stop_token>
 #include <thread>
-#include "async/awaitable_get.h"
-#include "async/task.h"
+
 
 #pragma execution_character_set("utf-8")
 
@@ -74,7 +73,7 @@ public:
 	void BrowseFileOrFolder(std::string Path);
 	void GoUpInDirectoryView();
 
-	async::task<void> LoadAndPlaySong(const std::string& songPath);
+	void LoadAndPlaySong(const std::string& songPath);
 	void RefreshFolderView();
 	void PlaySong(std::vector<uint8_t>& songData);
 	void StopSong();
@@ -82,12 +81,6 @@ public:
 
 	std::string GetSongDuration(const time_t& fullSeconds);
 	std::string GetCurrentSongTime();
-
-	inline async::task<void> fire_and_forget()
-	{
-		
-		co_return;
-	}
 
 private:
 	std::vector<std::string> songPaths;
@@ -106,7 +99,7 @@ private:
 	
 };
 
-async::task<void> BotLayer::LoadAndPlaySong(const std::string& songPath)
+void BotLayer::LoadAndPlaySong(const std::string& songPath)
 {
 	std::vector<uint8_t> SongData;
 	SongData.reserve(50000000);
@@ -157,7 +150,6 @@ async::task<void> BotLayer::LoadAndPlaySong(const std::string& songPath)
 	mpg123_exit();
 
 	PlaySong(SongData);
-	co_return;
 }
 
 void BotLayer::RefreshFolderView()
