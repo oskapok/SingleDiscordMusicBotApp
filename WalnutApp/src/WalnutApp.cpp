@@ -68,13 +68,15 @@ public:
 		ImGui::End();
 	}
 
+	void OnUpdate(float ts) override;
+
 	void OnAttach() override;
 	void OnDetach() override;
 	void BrowseFileOrFolder(std::string Path);
 	void GoUpInDirectoryView();
-
-	void LoadAndPlaySong(const std::string& songPath);
+	
 	void RefreshFolderView();
+	void CleanupDecoder();
 	void PlaySong(std::vector<uint8_t>& songData);
 	void StopSong();
 	void PauseOrUnpauseSong();
@@ -82,13 +84,17 @@ public:
 	std::string GetSongDuration(const time_t& fullSeconds);
 	std::string GetCurrentSongTime();
 
+	void PrepareSong(const std::string& songPath);
+	void InitDecoder();
+
 private:
 	std::vector<std::string> songPaths;
 	dpp::cluster* bot = nullptr;
 	dpp::snowflake guildId;
 	dpp::voiceconn* voiceConnection = nullptr;
 	dpp::discord_client* discordClient = nullptr;
-
+	
+	bool IsSongLoading = false;
 	long SongLengthInSamples = 0;
 	double SongLengthInSeconds = 0;
 
@@ -96,61 +102,13 @@ private:
 	std::string PathToSongFolder = "C://BotSongs/";
 	std::string CurrentlyPlayingSongName;
 
-	
+	mpg123_handle* mpgHandle = nullptr;
+	unsigned char* buffer = nullptr;
+	size_t buffer_size = 0;
+	int channels = 0, encoding = 0;
+	long rate = 0;
+	size_t done = 0;
 };
-
-void BotLayer::LoadAndPlaySong(const std::string& songPath)
-{
-	std::vector<uint8_t> SongData;
-	SongData.reserve(50000000);
-	
-	mpg123_init();
-	int err = 0;
-	unsigned char* buffer;
-	size_t buffer_size, done;
-	int channels, encoding;
-	long rate;
- 
-	/* Note it is important to force the frequency to 48000 for Discord compatibility */
-	mpg123_handle *mh = mpg123_new(NULL, &err);
-	mpg123_param(mh, MPG123_FORCE_RATE, SampleRate, SampleRate);
- 
-	/* Decode entire file into a vector. You could do this on the fly, but if you do that
-	* you may get timing issues if your CPU is busy at the time and you are streaming to
-	* a lot of channels/guilds.
-	*/
-	
-	buffer_size = mpg123_outblock(mh);
-	buffer = new unsigned char[buffer_size];
- 
-	/* Note: In a real world bot, this should have some error logging */
-	mpg123_open(mh, songPath.c_str());
-	mpg123_scan(mh);
-	mpg123_getformat(mh, &rate, &channels, &encoding);
-
-	SongLengthInSamples = mpg123_length(mh);
-	SongLengthInSeconds = static_cast<double>(SongLengthInSamples) / SampleRate;
-
-	CurrentSongLengthString = GetSongDuration(SongLengthInSeconds);
-	CurrentlyPlayingSongName = songPath.substr(songPath.find_last_of("/\\") + 1);
-
-
-	unsigned int counter = 0;
-	for (int totalBytes = 0; mpg123_read(mh, buffer, buffer_size, &done) == MPG123_OK; ) {
-		for (size_t i = 0; i < buffer_size; i++) {
-			SongData.emplace_back(buffer[i]);
-		}
-		counter += buffer_size;
-		totalBytes += done;
-	}
-	delete[] buffer;
-	mpg123_close(mh);
-	mpg123_delete(mh);
-	/* Clean up */
-	mpg123_exit();
-
-	PlaySong(SongData);
-}
 
 void BotLayer::RefreshFolderView()
 {
@@ -162,6 +120,47 @@ void BotLayer::RefreshFolderView()
 		std::replace( path.begin(), path.end(), '\\', '/'); 
 		songPaths.emplace_back(path);
 		std::cout << entry.path() << std::endl;
+	}
+}
+
+void BotLayer::CleanupDecoder()
+{
+	if(IsSongLoading)
+	{
+		IsSongLoading=false;
+		delete[] buffer;
+		mpg123_close(mpgHandle);
+		mpg123_delete(mpgHandle);
+		mpg123_exit();
+	}
+}
+
+void BotLayer::OnUpdate(float ts)
+{
+	Layer::OnUpdate(ts);
+
+	if(IsSongLoading)
+	{
+		std::vector<uint8_t> SongData;
+		SongData.reserve(buffer_size * 8);
+		for(int test = 0 ; test < 8; test ++)
+		{
+			if(mpg123_read(mpgHandle, buffer, buffer_size, &done) == MPG123_OK)
+			{
+				for (size_t i = 0; i < buffer_size; i++) {
+					SongData.emplace_back(buffer[i]);
+				}
+			}
+			else
+			{
+				CleanupDecoder();
+				break;
+			}
+		}
+		if(!SongData.empty())
+		{
+			PlaySong(SongData);
+		}
 	}
 }
 
@@ -239,7 +238,8 @@ void BotLayer::BrowseFileOrFolder(std::string Path)
 {
 	if(Path.ends_with(".mp3"))
 	{
-		LoadAndPlaySong(Path);
+		InitDecoder();
+		PrepareSong(Path);
 	}
 	else
 	{
@@ -269,6 +269,7 @@ void BotLayer::PlaySong(std::vector<uint8_t>& songData)
 void BotLayer::StopSong()
 {
 	voiceConnection->voiceclient->stop_audio();
+	CleanupDecoder();
 }
 
 void BotLayer::PauseOrUnpauseSong()
@@ -312,6 +313,34 @@ std::string BotLayer::GetCurrentSongTime()
 		snprintf(print_buffer, 64, "%02d:%02d:%02d", hours, mins, secs);
 		return print_buffer;
 	}
+}
+
+void BotLayer::PrepareSong(const std::string& songPath)
+{
+	buffer = new unsigned char[buffer_size];
+	
+	mpg123_open(mpgHandle, songPath.c_str());
+	mpg123_scan(mpgHandle);
+	mpg123_getformat(mpgHandle, &rate, &channels, &encoding);
+
+	SongLengthInSamples = mpg123_length(mpgHandle);
+	SongLengthInSeconds = static_cast<double>(SongLengthInSamples) / SampleRate;
+
+	CurrentSongLengthString = GetSongDuration(SongLengthInSeconds);
+	CurrentlyPlayingSongName = songPath.substr(songPath.find_last_of("/\\") + 1);
+
+	IsSongLoading = true;
+}
+
+void BotLayer::InitDecoder()
+{
+	mpg123_init();
+	
+	int err = 0;
+	mpgHandle = mpg123_new(NULL, &err);
+	mpg123_param(mpgHandle, MPG123_FORCE_RATE, SampleRate, SampleRate);
+	
+	buffer_size = mpg123_outblock(mpgHandle);
 }
 
 
