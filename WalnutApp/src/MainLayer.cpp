@@ -1,10 +1,11 @@
-﻿#include "MainLayer.h"
+#include "MainLayer.h"
 
 #include <fstream>
 #include <dpp/once.h>
 #include "imgui.h"
 
 constexpr uint_fast16_t SampleRate = 48000;
+#pragma execution_character_set("utf-8")
 
 void MainLayer::OnUIRender()
 {
@@ -50,10 +51,10 @@ void MainLayer::RefreshFolderView()
 	namespace fs = std::filesystem;
 	for ( auto & entry : fs::directory_iterator(PathToSongFolder.c_str()))
 	{
-		std::string path = entry.path().string();
-		std::replace( path.begin(), path.end(), '\\', '/'); 
-		songPaths.emplace_back(path);
-		std::cout << entry.path() << std::endl;
+		//auto path = std::string(entry.path().string());
+		//std::replace( path.begin(), path.end(), '\\', '/'); 
+		//songPaths.emplace_back(path);
+		//std::cout << entry.path() << std::endl;
 	}
 }
 

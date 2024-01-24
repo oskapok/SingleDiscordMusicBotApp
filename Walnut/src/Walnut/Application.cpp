@@ -17,9 +17,12 @@
 #include <iostream>
 
 // Emedded font
+#include <windows.h>
+
 #include "ImGui/Roboto-Regular.embed"
 
 extern bool g_ApplicationRunning;
+#pragma execution_character_set("utf-8")
 
 // [Win32] Our example includes a copy of glfw3.lib pre-compiled with VS2010 to maximize ease of testing and compatibility with old VS compilers.
 // To link with VS2010-era libraries, VS2015+ requires linking with legacy_stdio_definitions.lib, which we do using this pragma.
@@ -406,6 +409,7 @@ namespace Walnut {
 
 	void Application::Init()
 	{
+		SetConsoleOutputCP(CP_UTF8);
 		// Setup GLFW window
 		glfwSetErrorCallback(glfw_error_callback);
 		if (!glfwInit())
@@ -485,7 +489,8 @@ namespace Walnut {
 		// Load default font
 		ImFontConfig fontConfig;
 		fontConfig.FontDataOwnedByAtlas = false;
-		ImFont* robotoFont = io.Fonts->AddFontFromMemoryTTF((void*)g_RobotoRegular, sizeof(g_RobotoRegular), 20.0f, &fontConfig);
+		fontConfig.GlyphRanges = io.Fonts->GetGlyphRangesJapanese();
+		ImFont* robotoFont = io.Fonts->AddFontFromFileTTF("C:/Windows/Fonts/calibri.ttf", 18, nullptr, io.Fonts->GetGlyphRangesJapanese());
 		io.FontDefault = robotoFont;
 
 		// Upload Fonts
