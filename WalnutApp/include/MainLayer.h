@@ -32,7 +32,7 @@ public:
     void InitDecoder();
 
 private:
-    std::vector<std::string> songPaths;
+    std::vector<std::u8string> songPaths;
     dpp::cluster* bot = nullptr;
     dpp::snowflake guildId;
     dpp::voiceconn* voiceConnection = nullptr;

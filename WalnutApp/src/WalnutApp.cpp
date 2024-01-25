@@ -18,9 +18,8 @@ Walnut::Application* Walnut::CreateApplication(int argc, char** argv)
 	app->PushLayer<MainLayer>();
 	app->SetMenubarCallback([app]()
 	{
-		if (ImGui::BeginMenu(u8"Fileą"))
+		if (ImGui::BeginMenu("File"))
 		{
-			ImGui::DebugTextEncoding()
 			if (ImGui::MenuItem("Exit"))
 			{
 				app->Close();

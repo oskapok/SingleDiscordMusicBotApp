@@ -16,9 +16,9 @@ void MainLayer::OnUIRender()
     }
     for(auto songPath : songPaths)
     {
-        if(ImGui::Button(songPath.c_str()))
+        if(ImGui::Button((char *)songPath.c_str()))
         {
-            BrowseFileOrFolder(songPath.c_str());
+            BrowseFileOrFolder((char *)songPath.c_str());
             break;
         }
     }
@@ -26,6 +26,7 @@ void MainLayer::OnUIRender()
     ImGui::Begin("Media Controls");
     if(voiceConnection && voiceConnection->voiceclient->is_playing())
     {
+
         ImGui::Text(CurrentlyPlayingSongName.c_str());
         ImGui::Text(GetCurrentSongTime().c_str());
         ImGui::SameLine();
@@ -51,9 +52,9 @@ void MainLayer::RefreshFolderView()
 	namespace fs = std::filesystem;
 	for ( auto & entry : fs::directory_iterator(PathToSongFolder.c_str()))
 	{
-		//auto path = std::string(entry.path().string());
-		//std::replace( path.begin(), path.end(), '\\', '/'); 
-		//songPaths.emplace_back(path);
+		auto path = entry.path().u8string();
+		std::replace( path.begin(), path.end(), '\\', '/'); 
+		songPaths.emplace_back(path);
 		//std::cout << entry.path() << std::endl;
 	}
 }

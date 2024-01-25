@@ -490,7 +490,7 @@ namespace Walnut {
 		ImFontConfig fontConfig;
 		fontConfig.FontDataOwnedByAtlas = false;
 		fontConfig.GlyphRanges = io.Fonts->GetGlyphRangesJapanese();
-		ImFont* robotoFont = io.Fonts->AddFontFromFileTTF("C:/Windows/Fonts/calibri.ttf", 18, nullptr, io.Fonts->GetGlyphRangesJapanese());
+		ImFont* robotoFont = io.Fonts->AddFontFromFileTTF("C:/Windows/Fonts/calibri.ttf", 18, nullptr, io.Fonts->GetGlyphRangesPolish());
 		io.FontDefault = robotoFont;
 
 		// Upload Fonts
@@ -507,7 +507,7 @@ namespace Walnut {
 			err = vkBeginCommandBuffer(command_buffer, &begin_info);
 			check_vk_result(err);
 
-			ImGui_ImplVulkan_CreateFontsTexture(command_buffer);
+			ImGui_ImplVulkan_CreateFontsTexture();
 
 			VkSubmitInfo end_info = {};
 			end_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -520,7 +520,6 @@ namespace Walnut {
 
 			err = vkDeviceWaitIdle(g_Device);
 			check_vk_result(err);
-			ImGui_ImplVulkan_DestroyFontUploadObjects();
 		}
 	}
 
