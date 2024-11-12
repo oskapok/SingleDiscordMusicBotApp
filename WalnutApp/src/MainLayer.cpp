@@ -145,15 +145,26 @@ void MainLayer::OnAttach()
             
             /* Tell the user we joined their channel. */
             event.reply("Joined your channel!");
-        } 
+        }
+
+    	if (event.command.get_command_name() == "download") {
+    		std::string songLink = std::get<std::string>(event.get_parameter("link"));
+
+    		auto Command = std::format(" cd {} && yt-dlp -x --audio-format mp3 {}",PathToSongFolder, songLink);
+			event.reply("Started downloading song...");
+    		system(Command.data());
+		} 
     });
+	
  
     bot->on_ready([this](const dpp::ready_t & event) {
         if (dpp::run_once<struct register_bot_commands>()) {
             /* Create a new command. */
             dpp::slashcommand joincommand("join", "Joins your voice channel.", bot->me.id);
- 
-            bot->global_bulk_command_create({ joincommand });
+        	dpp::slashcommand PlayCommand("download","Download song",bot->me.id);
+        	PlayCommand.add_option(dpp::command_option(dpp::co_string,"link","link to the song",true));
+        	
+            bot->global_bulk_command_create({ joincommand, PlayCommand });
         }
     });
  
